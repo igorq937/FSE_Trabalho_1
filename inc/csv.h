@@ -1,5 +1,5 @@
-#ifndef CSV_LOG_H_
-#define CSV_LOG_H_
+#ifndef CSV_H_
+#define CSV_H_
 
 
 struct csv_log_data{
@@ -12,7 +12,8 @@ struct csv_log_data{
 
 
 void csv_create_log(void);
-void csv_add_log(struct csv_log_data log);
+void csv_append_log(struct csv_log_data log);
+int csv_read_csv_curve(float *temperature_, long* time_);
 
 
-#endif /* CSV_LOG_H_ */
+#endif /* CSV_H_ */
