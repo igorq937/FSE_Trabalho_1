@@ -86,7 +86,7 @@ void lcd_type_int(int integer)   {
 
 void lcd_type_float(float floating){
     char buffer[20];
-    sprintf(buffer, "%4.2f",  floating);
+    sprintf(buffer, "%2.1f",  floating);
     lcd_type_line(buffer);
 }
 

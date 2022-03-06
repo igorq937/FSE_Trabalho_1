@@ -1,5 +1,4 @@
 #include "modbus.h"
-// #include "uart.h"
 #include "crc16.h"
 
 
@@ -15,7 +14,7 @@ static const Byte matricula[] = {2, 2, 5, 8};
 
 
 static unsigned int timeout_microsecond = 100000;
-static Byte timeout_time = 5;
+static Byte timeout_time = 4;
 
 
 void modbus_init(Byte device_address_cod_, Byte function_cod_, Byte sub_cod_){
@@ -61,8 +60,10 @@ int modbus_write(const Byte *message, Byte message_size){
     memcpy(&buffer[index], matricula, sizeof(matricula));
     index += sizeof(matricula);
 
-    memcpy(&buffer[index], message, message_size);
-    index += message_size;
+    if(message != NULL){
+        memcpy(&buffer[index], message, message_size);
+        index += message_size;
+    }
 
     unsigned short crc = calculate_crc(buffer, index);
     memcpy(&buffer[index], &crc, sizeof(short));
