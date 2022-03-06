@@ -21,5 +21,5 @@ run: $(BINFILE)
 
 .PHONY: clean
 clean:
-	rm -r ./${OBJFOLDER}/*
-	rm -r ./$(BINFILE)
+	rm -rf ./${OBJFOLDER}/*
+	rm -rf ./$(BINFILE)

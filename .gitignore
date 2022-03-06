@@ -38,6 +38,7 @@ app
 *.hex
 
 # Debug files
+log.csv
 *.dSYM/
 *.su
 *.idb
