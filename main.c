@@ -12,6 +12,7 @@
 #include <stdio.h>    
 #include <softPwm.h>
 #include <unistd.h>
+#include <pthread.h>
 
 
 #define MODE_TERMINAL       0x00
@@ -37,11 +38,26 @@ long curve_lines = 0;
 float curve_temperature[CSV_LINES_MAX];
 long curve_time[CSV_LINES_MAX];
 long curve_line = CSV_START_LINE;
-long curve_clock = 0;
+long long curve_clock_last = 0;
+
+pthread_t thread_id_log_csv;
 
 
-void sig_handler(){
+void exit_thread(){
+    pthread_exit(NULL);
+}
+
+long long timeInMicroseconds(void){
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return ((((long long)tv.tv_sec)*1000000)+(tv.tv_usec));
+}
+
+
+void shutdown(){
     printf("### DESLIGANDO! ###\n");
+    pthread_kill(thread_id_log_csv, SIGUSR1);
 
     softPwmWrite(RESISTOR_PIN, 0);
     softPwmWrite(FAN_PIN, 0);
@@ -95,10 +111,10 @@ void lcd_routine(){
     lcd_type_float(log_data.reference_temperature);
 
     lcd_set_line(LCD_LINE2);
-    lcd_type_line("Ti:");
-    lcd_type_float(log_data.internal_temperature);
-    lcd_type_line("  Te:");
+    lcd_type_line("Te:");
     lcd_type_float(log_data.external_temperature);
+    lcd_type_line("  Ti:");
+    lcd_type_float(log_data.internal_temperature);
 }
 
 void user_routine(){
@@ -112,7 +128,7 @@ void user_routine(){
         break;
     case ESP_USER_COMMAND_OFF:
         printf("### PRESSIONADO DESLIGAR! ###\n");
-        sig_handler();
+        shutdown();
         break;
     case ESP_USER_COMMAND_POTENTIOMETER:
         printf("### PRESSIONADO PONTECIOMETRO! ###\n");
@@ -122,6 +138,8 @@ void user_routine(){
     case ESP_USER_COMMAND_CURVE:
         printf("### PRESSIONADO CURVA REFLOW! ###\n");
         uart = UART_MODE_CURVE;
+        curve_line = CSV_START_LINE;
+        curve_clock_last = timeInMicroseconds();
         send_control_mode(ESP_SEND_MODE_CURVE);
         break;
     }
@@ -132,16 +150,13 @@ void control_temperature_routine(){
     if(mode == MODE_UART){
         if(uart == UART_MODE_POTENTIOMETER){
             request_potentiometer(&reference_temperature);
-        }else{
-            if(curve_clock == curve_time[curve_line])
+        }else if(curve_line < curve_lines){
+            if((timeInMicroseconds() - curve_clock_last)/1000000 >= curve_time[curve_line]){
                 reference_temperature = curve_temperature[curve_line++];
+            }
             
-            curve_clock++;
-            if(curve_clock == curve_lines){
-                uart = UART_MODE_POTENTIOMETER;
-                send_control_mode(ESP_SEND_MODE_POTENTIOMETER);
+            if(curve_line == curve_lines){
                 printf("### CURVE REFLOW TERMINOU! ###\n");
-                printf("### MODO POTENCIOMETRO HABILITADO! ###\n");
             }
         }
     }
@@ -161,30 +176,30 @@ void control_temperature_routine(){
 
 void loop_routine(){
     printf("\n### Executando rotina! ###\n");
+    modbus_open();
     user_routine();
     control_temperature_routine();
-    csv_append_log(log_data);
+    modbus_close();
     lcd_routine();
 }
 
-long long timeInMicroseconds(void){
-
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return ((((long long)tv.tv_sec)*1000000)+(tv.tv_usec));
-}
-
-void loop(long long microseconds_tick){
+void* loop(){
 
     long long wait = 0;
     long long currentTime = 0;
     long long lastTime = timeInMicroseconds();
+    pthread_t id = pthread_self();
 
     while(1){
         currentTime = timeInMicroseconds();
-        wait += microseconds_tick - (currentTime - lastTime);
         
-        loop_routine();
+        if(pthread_equal(id, thread_id_log_csv)){
+            csv_append_log(log_data);
+            wait += 1000000 - (currentTime - lastTime);
+        }else{
+            loop_routine();
+            wait += 500000 - (currentTime - lastTime);
+        }
 
         if(wait > 0){
             usleep(wait);
@@ -248,7 +263,7 @@ void scan_pid_consts(){
             break;
 
         case '3':
-            printf("\nInforme a cosntantes Kp Ki Kd para o PID:\n\n");
+            printf("\nInforme a constantes Kp Ki Kd para o PID:\n\n");
             printf("=======> ");
             scanf("%lf %lf %lf", &Kp, &Ki, &Kd);
             break;
@@ -263,6 +278,8 @@ void scan_pid_consts(){
 
 int main(void){
 
+    signal(SIGINT, shutdown);
+    signal(SIGUSR1, exit_thread);
     //setando estado inicial do sistema
     send_on_off(ESP_SEND_OFF);
     send_control_mode(ESP_SEND_MODE_POTENTIOMETER);
@@ -272,8 +289,12 @@ int main(void){
     if(wiringPiSetup() == -1) exit(1);
     if(lcd_init() == -1) exit(1);
     if(bme280_driver_init() != BME280_OK) exit(1);  
-    signal(SIGINT, sig_handler);
     
+    lcd_clear();
+    lcd_type_line("    SISTEMA");
+    lcd_set_line(LCD_LINE2);
+    lcd_type_line(" INICIALIZANDO");
+
     pinMode(RESISTOR_PIN, OUTPUT);
 	pinMode(FAN_PIN, OUTPUT);
 	softPwmCreate(RESISTOR_PIN, 1, 100);
@@ -283,6 +304,7 @@ int main(void){
 	scan_mode();
     csv_create_log();
 
+    modbus_open();
     if(mode == MODE_TERMINAL){
         send_control_mode(ESP_SEND_MODE_CURVE);
     }else{
@@ -291,9 +313,12 @@ int main(void){
     }
 
     send_on_off(ESP_SEND_ON);
+    modbus_close();
+    sleep(1);
     printf("### SISTEMA LIGADO! ###\n");
 
-    loop(1000000);
+    pthread_create(&thread_id_log_csv, NULL, loop, NULL);
+    loop();
 
     return 0;
 }

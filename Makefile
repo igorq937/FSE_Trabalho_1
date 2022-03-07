@@ -6,7 +6,7 @@ OBJFOLDER := obj
 
 CC := gcc 
 CFLAGS := -Wextra -Wall -pedantic
-LFLAGS := -lwiringPi
+LFLAGS := -lwiringPi -lpthread
 SRCFILES := $(wildcard $(SRCFOLDER)/*.c)
 
 all: $(SRCFILES:$(SRCFOLDER)/%.c=$(OBJFOLDER)/%.o)

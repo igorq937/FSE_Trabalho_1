@@ -13,12 +13,15 @@ static Byte sub_cod = 0x00;
 static const Byte matricula[] = {2, 2, 5, 8};
 
 
-static unsigned int timeout_microsecond = 100000;
-static Byte timeout_time = 4;
+static unsigned int timeout_microsecond = 10000;
+static Byte timeout_time = 15;
 
+
+void modbus_open(){
+    uart_init();
+}
 
 void modbus_init(Byte device_address_cod_, Byte function_cod_, Byte sub_cod_){
-    uart_init();
     device_address_cod = device_address_cod_;
     function_cod = function_cod_;
     sub_cod = sub_cod_;
@@ -29,7 +32,8 @@ int modbus_read(Byte *message, Byte message_size){
     int size = 0;
     unsigned int timeout = timeout_time;
 
-    while(size == 0 && timeout != 0){
+    size = uart_read(message, message_size);
+    while(size <= 0 && timeout != 0){
         usleep(timeout_microsecond);
         size = uart_read(message, message_size);
         timeout--;

@@ -15,6 +15,7 @@
 #define SUB_COD_REQUEST_STRING 0xA3
 
 
+void modbus_open();
 void modbus_init(Byte address, Byte func_cod, Byte sub_cod);
 int modbus_read(Byte *message, Byte message_size);
 int modbus_write(const Byte *message, Byte message_size);

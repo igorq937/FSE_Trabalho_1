@@ -1,7 +1,6 @@
 #include "esp32_control.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 
 #define MESSAGE_MAX_SIZE        128
@@ -14,52 +13,54 @@
 #define TEMPERATURE_MAX         70.0f
 
 #define RETURN_MESSAGE_SIZE     4
-#define ESP_TIMEOUT             2
+#define ESP_TIMEOUT             3
 
 
 static Byte message_buffer[MESSAGE_MAX_SIZE];
 static float last_internal_temperature = 0;
 static float last_potentiometer_temperature = 0;
 
+void esp32_control_open(){
+    modbus_open();
+}
 
 int request_esp(void *return_message, Byte sub_code){
 
+    modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);//Limpar leitura
     modbus_init(ESP_ADDRESS_DEVICE, ESP_REQUEST, sub_code);
-    
-    int size = 0;
-    for(int i = 0; size <= 0 && i < ESP_TIMEOUT; i++){
-        modbus_write(NULL, 0);
-        size = modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);
-        if(size <= 0) continue;
+    int error = 0;
+    for(int i = 0; error <= 0 && i < ESP_TIMEOUT; i++){
+        error = modbus_write(NULL, 0);
+        if(error <= 0) continue;
+        error = modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);
     }
 
     memcpy(return_message, &message_buffer[3], RETURN_MESSAGE_SIZE);
-    modbus_close();
 
     return ESP_R_SUCCESS;
 }
 
 int send2esp(void *data, Byte data_size, void *return_message, Byte sub_code){
 
+    modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);//Limpar leitura
     modbus_init(ESP_ADDRESS_DEVICE, ESP_SEND, sub_code);
-    int size = modbus_write(data, data_size);
-    if(size == -1) return ESP_R_FAIL;
+    int error = modbus_write(data, data_size);
+    if(error == -1) return ESP_R_FAIL;
 
     if(return_message != NULL){
-        size = modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);
-        if(size == -1) return ESP_R_FAIL;
+        error = modbus_read(&message_buffer[0], MESSAGE_MAX_SIZE);
+        if(error == -1) return ESP_R_FAIL;
 
         memcpy(return_message, &message_buffer[3], RETURN_MESSAGE_SIZE);
     }
     
-    modbus_close();
     return ESP_R_SUCCESS;
 }
 
 int request_internal_temperature(float *temperature){
     
     int error = request_esp(temperature, 0xC1);
-    for(int i = 0; (*temperature <= TEMPERATURE_ERROR && *temperature >= -TEMPERATURE_ERROR) && i < ESP_TIMEOUT; i++){
+    for(int i = 0; error <= 0 && i < ESP_TIMEOUT; i++){
         error = request_esp(temperature, 0xC1);
     }
 
@@ -75,7 +76,7 @@ int request_internal_temperature(float *temperature){
 int request_potentiometer(float *temperature){
     
     int error = request_esp(temperature, 0xC2);
-    for(int i = 0; (*temperature <= TEMPERATURE_ERROR && *temperature >= -TEMPERATURE_ERROR) && i < ESP_TIMEOUT; i++){
+    for(int i = 0; error <= 0 && i < ESP_TIMEOUT; i++){
         error = request_esp(temperature, 0xC2);
     }
 
@@ -106,6 +107,9 @@ int send_reference_tempetature(float temperature){
 int send_on_off(Byte on_off){
     Byte bytes[4];
     send2esp(&on_off, sizeof(Byte), bytes, 0xD3);
+    for(int i = 0; bytes[0] != on_off && i < ESP_TIMEOUT; i++){
+        send2esp(&on_off, sizeof(Byte), bytes, 0xD3);
+    }
     if(bytes[0] != on_off) return ESP_R_FAIL;
     return ESP_R_SUCCESS;
 }
@@ -113,6 +117,13 @@ int send_on_off(Byte on_off){
 int send_control_mode(Byte mode){
     Byte bytes[4];
     send2esp(&mode, sizeof(Byte), bytes, 0xD4);
+    for(int i = 0; bytes[0] != mode && i < ESP_TIMEOUT; i++){
+        send2esp(&mode, sizeof(Byte), bytes, 0xD4);
+    }
     if(bytes[0] != mode) return ESP_R_FAIL;
     return ESP_R_SUCCESS;
+}
+
+void esp_control_close(){
+    modbus_close();
 }
