@@ -47,6 +47,16 @@ Após configurado o PID escolha um modo de operação:
 - Terminal: É escolhida um temperatura de referência e o sistema trabalha para alcançar essa temperatura até sua interrupção.
 - UART: Neste modo o sistema usara por padrão a temperatura do potenciômetro, podendo ser posteriormente mudada para curva reflow ao acionar o botão correspondente;
 
+Ambos os modos quando pressionado o botão de desligar o sistema e desligado, também ambos ligam o sistema automaticamente.
+
+## Interface
+
+---
+
+A interface para utilização do sistema via UART (Disponibilizada para realização do trabalho):
+
+![UART Interface](./img/Dashboard.png)
+
 ## Tela LCD 16x2
 
 ---
@@ -67,6 +77,28 @@ Te       | Temperatura Externa (Ambiente)
 ---
 
 O sistema gerará um arquivo log.csv que guarda as temperaturas Tr, Ti e Te, sinal de controle da resistência e ventoinha, além da data e horário.
+
+## Terminal
+
+---
+
+No terminal é exibido as seguintes informações:
+
+```
+### Executando rotina! ###
+Temperatura de referencia: 38.0 C'
+Temperatura interna:       28.6 C'
+Sinal de controle:         100.0%
+```
+
+Além da rotina padrão será exibido quando foi pressionado algum botão da interface:
+
+```
+### PRESSIONADO LIGAR! ###
+### PRESSIONADO DESLIGAR! ###
+### PRESSIONADO PONTECIOMETRO! ###
+### PRESSIONADO CURVA REFLOW! ###
+```
 
 ## Testes
 
